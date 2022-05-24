@@ -41,6 +41,10 @@
   {:name nm
    :items {}})
 
+(defn get-all-list
+  [db-val]
+  db-val)
+
 (defn make-list-item
   [nm]
   {:name nm
@@ -59,6 +63,19 @@
   (if (contains? db-val list-id)
     (assoc-in db-val [list-id :items item-id] new-item)
     db-val))
+
+(defn list-item-modify
+  [db-val list-id item-id name]
+  (if (contains? db-val list-id)
+    (if (contains? (get-in db-val [list-id :items]) item-id)
+      (assoc-in db-val [list-id :items item-id :name] name)
+      db-val)
+    db-val))
+
+(defn list-item-remove
+  [db-val list-id item-id]
+  (update-in db-val [list-id :items] dissoc item-id))
+
 ;; end of in memory db specific functions.
 
 ;; interceptors
@@ -73,6 +90,14 @@
        (assoc context
               :response (created new-list "Location" url)
               :tx-data [assoc db-id new-list])))})
+
+(def list-all
+  {:name :list-all
+   :leave
+   (fn [context]
+     (if-let [lists (get-in context [:request :database])]
+       (assoc context :result (get-all-list lists))
+       context))})
 
 (def list-view
   {:name :list-view
@@ -95,16 +120,39 @@
                 context)
               context))})
 
-(def list-item-create 
+(def list-item-create
   {:name :list-item-create
    :enter (fn [context]
             (if-let [list-id (get-in context [:request :path-params :list-id])]
-              (let [nm (get-in context [:request :queury-params :name] "Unnamed item")
+              (let [nm (get-in context [:request :query-params :name] "Unnamed item")
                     new-item (make-list-item nm)
                     item-id (str (gensym "i"))]
                 (-> context
                     (assoc :tx-data [list-item-add list-id item-id new-item])
                     (assoc-in [:request :path-params :item-id] item-id)))
+              context))})
+
+(def list-item-update
+  {:name :list-item-update
+   :enter (fn [context]
+            (if-let [list-id (get-in context [:request :path-params :list-id])]
+              (if-let [item-id (get-in context [:request :path-params :item-id])]
+                (if-let [nm (get-in context [:request :query-params :name] "default name")]
+                  (-> context
+                      (assoc :tx-data [list-item-modify list-id item-id nm])
+                      (assoc-in [:request :path-params :item-id] item-id))
+                  context)
+                context)
+              context))})
+
+(def list-item-delete
+  {:name :list-item-delete
+   :enter (fn [context]
+            (if-let [list-id (get-in context [:request :path-params :list-id])]
+              (if-let [item-id (get-in context [:request :path-params :item-id])]
+                (-> context
+                    (assoc :tx-data [list-item-remove list-id item-id]))
+                context)
               context))})
 
 (def echo
@@ -119,13 +167,13 @@
 
 (def routes
   (route/expand-routes
-   #{["/todo" :post [db-interceptor list-create]]
-     ["/todo" :get echo :route-name :list-query-form]
+   #{["/todo" :post [ db-interceptor list-create]]
+     ["/todo" :get [entity-render db-interceptor list-all]]
      ["/todo/:list-id" :get [entity-render db-interceptor list-view]]
      ["/todo/:list-id" :post [entity-render list-item-view db-interceptor list-item-create]]
      ["/todo/:list-id/:item-id" :get [entity-render list-item-view db-interceptor]]
-     ["/todo/:list-id/:item-id" :put echo :route-name :list-item-update]
-     ["/todo/:list-id/:item-id" :delete echo :route-name :list-item-delete]}))
+     ["/todo/:list-id/:item-id" :put [entity-render list-item-view db-interceptor list-item-update]]
+     ["/todo/:list-id/:item-id" :delete [entity-render  list-all db-interceptor list-item-delete]]}))
 
 
 (def service-map
