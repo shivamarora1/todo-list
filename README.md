@@ -17,3 +17,8 @@ GET /todo/:list-id/:item-id : get item from the list
 PUT /todo/:list-id/:item-id : update the item inside the list
 DELETE /todo/:list-id/:item-id : delete item from the list
 ```
+
+- Moving it to Ring http.
+- Integrating with SQL.
+- Routes Coercions means validation of Param.
+- Test files.
