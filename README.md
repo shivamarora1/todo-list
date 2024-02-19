@@ -22,3 +22,5 @@ DELETE /todo/:list-id/:item-id : delete item from the list
 - Integrating with SQL.
 - Routes Coercions means validation of Param.
 - Test files.
+- Linter
+- Pre commit handler
